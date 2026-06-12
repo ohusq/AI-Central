@@ -10,10 +10,11 @@
     try {
       var res = await fetch('https://wttr.in/?format=%C|%t|%l', { signal: AbortSignal.timeout(4000) });
       var text = await res.text();
+      if (/[<>]/.test(text)) return null;
       var parts = text.split('|').map(function (s) { return s.trim(); });
-      if (parts.length >= 3) {
+      if (parts.length >= 3 && /^[a-z\s]+$/i.test(parts[0]) && /^[+-]?\d+[°]?[CF]?$/.test(parts[1]) && /^[a-z\s,.-]+$/i.test(parts[2])) {
         var tempMatch = parts[1].match(/-?\d+/);
-        weatherCache = { condition: parts[0], temperature: tempMatch ? tempMatch[0] : '?', location: parts[2] };
+        weatherCache = { condition: parts[0], temperature: tempMatch[0], location: parts[2] };
         weatherCacheTime = Date.now();
       }
     } catch (e) {}
