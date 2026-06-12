@@ -1,3 +1,6 @@
+const TRASH_ICON = '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 5h15"/><path d="M4 5v10a2 2 0 002 2h8a2 2 0 002-2V5"/><path d="M7 5V3.5a1 1 0 011-1h4a1 1 0 011 1V5"/><path d="M8 8.5v5"/><path d="M12 8.5v5"/></svg>';
+const CONFIRM_ICON = '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 5l10 10"/><path d="M15 5L5 15"/></svg>';
+
 const LM_STUDIO_BASE = 'http://localhost:1234';
 const input = document.getElementById('message-input');
 const sendBtn = document.getElementById('send-btn');
@@ -102,8 +105,64 @@ function renderConversationList() {
         if (conv.id === currentConversationId) {
             item.classList.add('active');
         }
-        item.textContent = conv.title;
+
+        const titleSpan = document.createElement('span');
+        titleSpan.className = 'conv-title';
+        titleSpan.textContent = conv.title;
+        item.appendChild(titleSpan);
+
+        const del = document.createElement('button');
+        del.className = 'conv-delete';
+        del.innerHTML = TRASH_ICON;
+        del.title = 'Delete conversation';
+
+        let clickCount = 0;
+        let resetTimer = null;
+
+        del.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (clickCount === 0) {
+                clickCount = 1;
+                del.classList.add('confirming');
+                del.innerHTML = CONFIRM_ICON;
+                resetTimer = setTimeout(() => {
+                    clickCount = 0;
+                    del.classList.remove('confirming');
+                    del.innerHTML = TRASH_ICON;
+                }, 2000);
+                return;
+            }
+            clearTimeout(resetTimer);
+            const idx = conversations.indexOf(conv);
+            if (idx === -1) return;
+            conversations.splice(idx, 1);
+            saveConversations();
+            if (currentConversationId === conv.id) {
+                if (conversations.length > 0) {
+                    switchConversation(conversations[0].id);
+                } else {
+                    const newConv = createConversation();
+                    switchConversation(newConv.id);
+                }
+            } else {
+                renderConversationList();
+            }
+        });
+
+        item.addEventListener('mouseleave', () => {
+            if (clickCount === 1) {
+                clickCount = 0;
+                if (resetTimer !== null) {
+                    clearTimeout(resetTimer);
+                    resetTimer = null;
+                }
+                del.classList.remove('confirming');
+                del.innerHTML = TRASH_ICON;
+            }
+        });
+
         item.addEventListener('click', () => switchConversation(conv.id));
+        item.appendChild(del);
         conversationListEl.appendChild(item);
     });
 }
