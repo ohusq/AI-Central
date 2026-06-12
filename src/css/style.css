@@ -12,13 +12,12 @@ body {
     align-items: center;
     padding-top: 45vh;
     transition: padding-top 0.6s cubic-bezier(0.4, 0, 0.2, 1);
-    overflow-y: auto;
+    overflow: hidden;
 }
 
 body.sent {
     height: 100vh;
     padding-top: 0;
-    overflow: hidden;
 }
 
 .main-container {
@@ -140,21 +139,38 @@ body.sent .result-container {
     padding-right: 4px;
 }
 
+body.sent .result-container {
+    scrollbar-width: thin;
+    scrollbar-color: #3a3a3a #1a1a1a;
+}
+
 body.sent .result-container::-webkit-scrollbar {
-    width: 6px;
+    width: 8px;
+    height: 8px;
+}
+
+body.sent .result-container::-webkit-scrollbar-button {
+    display: none;
+    width: 0;
+    height: 0;
 }
 
 body.sent .result-container::-webkit-scrollbar-track {
-    background: transparent;
+    background: #1a1a1a;
 }
 
 body.sent .result-container::-webkit-scrollbar-thumb {
-    background: #333;
-    border-radius: 3px;
+    background: #3a3a3a;
+    border-radius: 4px;
+    transition: background 0.2s ease;
 }
 
 body.sent .result-container::-webkit-scrollbar-thumb:hover {
     background: #555;
+}
+
+body.sent .result-container::-webkit-scrollbar-corner {
+    background: #1a1a1a;
 }
 
 #chat-result {
@@ -315,6 +331,19 @@ body.sent .result-container::-webkit-scrollbar-thumb:hover {
     overflow-x: auto;
     background: #151515;
     border: 1px solid #2a2a2a;
+    scrollbar-color: #3a3a3a #1a1a1a;
+}
+
+.markdown-body pre::-webkit-scrollbar-track {
+    background: #1a1a1a;
+}
+
+.markdown-body pre::-webkit-scrollbar-thumb {
+    background: #3a3a3a;
+}
+
+.markdown-body pre::-webkit-scrollbar-thumb:hover {
+    background: #555;
 }
 
 .markdown-body pre code {
@@ -342,3 +371,4 @@ body.sent .result-container::-webkit-scrollbar-thumb:hover {
         transform: translateY(0);
     }
 }
+
