@@ -1,0 +1,2 @@
+# One URL per line — these are the seed pages where the crawler starts.
+# https://nos.nl/
