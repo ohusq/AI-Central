@@ -77,7 +77,10 @@ async function sendMessage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
             model: modelName,
-            messages: [{ role: 'user', content: message }],
+            messages: [
+                { role: 'system', content: 'You are a helpful assistant.' },
+                { role: 'user', content: message }
+            ],
             stream: true
         })
     });
