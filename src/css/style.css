@@ -177,7 +177,7 @@ body.sent .chat-container {
 
 .conversation-item.active {
     background: #1e1e1e;
-    border-left-color: #58a6ff;
+    border-left-color: #c4c4c4;
     color: #eeeeeef8;
 }
 
