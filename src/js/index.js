@@ -1,16 +1,35 @@
 const LM_STUDIO_BASE = 'http://localhost:1234';
 const input = document.getElementById('message-input');
 const sendBtn = document.getElementById('send-btn');
-const resultDiv = document.getElementById('chat-result').querySelector('p');
+const chatResult = document.getElementById('chat-result');
 
 let modelName = '';
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function scrollToBottom() {
+    const el = document.querySelector('.result-container');
+    if (el) el.scrollTop = el.scrollHeight;
+}
+
+function renderMarkdown(raw, container) {
+    container.innerHTML = marked.parse(raw, { breaks: true, gfm: true });
+    container.querySelectorAll('pre code').forEach(block => {
+        hljs.highlightElement(block);
+    });
+    scrollToBottom();
+}
 
 async function init() {
     const res = await fetch(`${LM_STUDIO_BASE}/v1/models`);
     const data = await res.json();
     modelName = data.data[0]?.id;
     if (!modelName) {
-        resultDiv.textContent = 'No model loaded in LM Studio';
+        chatResult.textContent = 'No model loaded in LM Studio';
         sendBtn.disabled = true;
     }
 }
@@ -22,8 +41,36 @@ async function sendMessage() {
     const message = input.value.trim();
     if (!message || !modelName) return;
 
+    document.body.classList.add('sent');
+
+    const userDiv = document.createElement('div');
+    userDiv.className = 'message user-message';
+    userDiv.innerHTML = '<span class="message-label">User:</span>' + escapeHtml(message);
+    chatResult.appendChild(userDiv);
+    scrollToBottom();
+
+    const aiDiv = document.createElement('div');
+    aiDiv.className = 'message ai-message';
+
+    const aiLabel = document.createElement('span');
+    aiLabel.className = 'message-label';
+    aiLabel.textContent = 'AI:';
+    aiDiv.appendChild(aiLabel);
+
+    const reasoningEl = document.createElement('span');
+    reasoningEl.className = 'reasoning-text';
+    reasoningEl.textContent = '*reasoning*';
+    aiDiv.appendChild(reasoningEl);
+
+    const contentEl = document.createElement('div');
+    contentEl.className = 'response-text markdown-body';
+
+    chatResult.appendChild(aiDiv);
     input.value = '';
-    resultDiv.textContent = '';
+    input.focus();
+
+    let hasStarted = false;
+    let rawMarkdown = '';
 
     const response = await fetch(`${LM_STUDIO_BASE}/v1/chat/completions`, {
         method: 'POST',
@@ -36,7 +83,13 @@ async function sendMessage() {
     });
 
     if (!response.ok) {
-        resultDiv.textContent = `Error: ${response.status} ${response.statusText}`;
+        reasoningEl.classList.add('fading');
+        setTimeout(() => {
+            reasoningEl.remove();
+            contentEl.textContent = `Error: ${response.status} ${response.statusText}`;
+            aiDiv.appendChild(contentEl);
+            scrollToBottom();
+        }, 400);
         return;
     }
 
@@ -60,9 +113,28 @@ async function sendMessage() {
             try {
                 const json = JSON.parse(data);
                 const content = json.choices?.[0]?.delta?.content || '';
-                resultDiv.textContent += content;
+
+                if (!hasStarted && content) {
+                    hasStarted = true;
+                    reasoningEl.classList.add('fading');
+                    setTimeout(() => {
+                        reasoningEl.remove();
+                        aiDiv.appendChild(contentEl);
+                        scrollToBottom();
+                    }, 400);
+                }
+
+                if (hasStarted) {
+                    rawMarkdown += content;
+                    renderMarkdown(rawMarkdown, contentEl);
+                }
             } catch { }
         }
+    }
+
+    if (!hasStarted) {
+        reasoningEl.classList.add('fading');
+        setTimeout(() => reasoningEl.remove(), 400);
     }
 }
 
