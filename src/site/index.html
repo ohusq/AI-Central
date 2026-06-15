@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100..900;1,100..900&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="css/style.css" />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css"
+    />
+    <script
+      src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"
+      defer
+    ></script>
+    <script
+      src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"
+      defer
+    ></script>
+    <script src="js/greetings.js" defer></script>
+    <script src="js/tools.js" defer></script>
+    <script src="js/index.js" defer></script>
+
+    <link rel="shortcut icon" href="favicon.ico" type="image/gif" />
+    <!-- most likely only works on firefox :( -->
+    <title>AI Central</title>
+  </head>
+  <body>
+    <div class="sidebar-hover-trigger" id="sidebar-trigger"></div>
+    <div class="sidebar-container" id="sidebar">
+      <div class="sidebar-inner">
+        <div class="sidebar-header">
+          <span class="sidebar-title">Conversations</span>
+          <div style="display: flex; gap: 4px">
+            <button
+              class="new-chat-btn"
+              id="reset-perm-btn"
+              title="Reset tool permissions"
+              style="font-size: 14px; font-weight: 400"
+            >
+              &#x267B;
+            </button>
+            <button
+              class="new-chat-btn"
+              id="new-chat-btn"
+              title="New conversation"
+            >
+              +
+            </button>
+          </div>
+        </div>
+        <div class="conversation-list" id="conversation-list"></div>
+      </div>
+    </div>
+
+    <div class="main-container">
+      <div class="chat-container">
+        <div class="result-container">
+          <div id="chat-result"></div>
+        </div>
+
+        <div class="chat-input">
+          <input
+            id="message-input"
+            type="text"
+            placeholder="Type your message here..."
+          />
+          <button id="send-btn">Send</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Permission modal -->
+    <div id="permission-modal" class="permission-overlay">
+      <div class="permission-modal">
+        <div class="perm-header">&#x26A0; Permission Required</div>
+        <div class="perm-body">
+          <div class="perm-row">
+            <span class="perm-label">Tool:</span>
+            <span id="perm-tool-name" class="perm-value"></span>
+          </div>
+          <div class="perm-row">
+            <span class="perm-label">Description:</span>
+            <span id="perm-tool-desc" class="perm-value"></span>
+          </div>
+          <div class="perm-row perm-args-row">
+            <span class="perm-label">Arguments:</span>
+            <code id="perm-tool-args" class="perm-code"></code>
+          </div>
+        </div>
+        <div class="perm-note">
+          This tool requires approval before it can execute. Always Allow saves
+          this decision for future sessions.
+        </div>
+        <div class="perm-actions">
+          <button
+            class="perm-btn perm-deny"
+            onclick="handlePermissionResponse('deny')"
+          >
+            Deny
+          </button>
+          <button
+            class="perm-btn perm-once"
+            onclick="handlePermissionResponse('once')"
+          >
+            Allow Once
+          </button>
+          <button
+            class="perm-btn perm-always"
+            onclick="handlePermissionResponse('always')"
+          >
+            Always Allow
+          </button>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

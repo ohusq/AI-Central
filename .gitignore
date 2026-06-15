@@ -1,2 +1,5 @@
 /src/.venv
-/NOTES.TXT
+/tool_data/
+__pycache__/
+*.pyc
+NOTES.TXT
