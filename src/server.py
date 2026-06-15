@@ -449,6 +449,34 @@ def tool_programming_help(args):
     return 'No search results for "' + query + '".'
 
 
+_USER_FOLDERS = {
+    "desktop": Path.home() / "Desktop",
+    "documents": Path.home() / "Documents",
+    "downloads": Path.home() / "Downloads",
+}
+
+
+def _resolve_path(path_str):
+    """Resolve a user-supplied path to an absolute path.
+       - ~/...  → user home directory
+       - absolute path  → used as-is
+       - Desktop/..., Documents/..., Downloads/...  → real user folder
+       - everything else → resolved from WORKSPACE_DIR
+    """
+    if path_str.startswith("~"):
+        path_str = str(Path.home() / path_str.lstrip("~\\/"))
+    user_path = Path(path_str)
+    if user_path.is_absolute():
+        return user_path.resolve()
+    # Check if the first component is a well-known user folder
+    parts = user_path.parts
+    if parts and parts[0].lower() in _USER_FOLDERS:
+        base = _USER_FOLDERS[parts[0].lower()]
+        rest = Path(*parts[1:]) if len(parts) > 1 else Path(".")
+        return (base / rest).resolve()
+    return (WORKSPACE_DIR / path_str).resolve()
+
+
 def tool_io_operations(args):
     action = args.get("action", "").strip()
     path = args.get("path", "").strip()
@@ -457,20 +485,8 @@ def tool_io_operations(args):
         return "No action specified. Use read, write, list, or delete."
     if action != "list" and not path:
         return "No path specified."
-    safe_path = WORKSPACE_DIR / path.lstrip("/\\")
-    safe_path = safe_path.resolve()
-    try:
-        safe_path.relative_to(WORKSPACE_DIR)
-    except ValueError:
-        return "Error: Path is outside the workspace directory."
     if action == "list":
-        target = (
-            (WORKSPACE_DIR / path.lstrip("/\\")).resolve() if path else WORKSPACE_DIR
-        )
-        try:
-            target.relative_to(WORKSPACE_DIR)
-        except ValueError:
-            return "Error: Path is outside the workspace directory."
+        target = _resolve_path(path) if path else WORKSPACE_DIR
         if not target.exists():
             return f"Path does not exist: {target}"
         if target.is_file():
@@ -488,7 +504,8 @@ def tool_io_operations(args):
             if lines
             else "Directory is empty."
         )
-    elif action == "read":
+    safe_path = _resolve_path(path)
+    if action == "read":
         if not safe_path.is_file():
             return f"File not found: {path}"
         try:
@@ -533,19 +550,33 @@ TOOL_EXECUTORS = {
 # --------------- routes ---------------
 
 
+@app.route("/environment", methods=["GET"])
+def get_environment():
+    home = Path.home()
+    return jsonify({
+        "os": "Windows",
+        "username": os.environ.get("USERNAME", ""),
+        "home": str(home),
+        "desktop": str(home / "Desktop"),
+        "documents": str(home / "Documents"),
+        "downloads": str(home / "Downloads"),
+        "workspace": str(WORKSPACE_DIR),
+    })
+
+
 @app.route("/")
 def serve_index():
     return send_from_directory(SITE_DIR, "index.html")
 
 
-@app.route("/<path:filename>")
-def serve_static(filename):
-    return send_from_directory(SITE_DIR, filename)
-
-
 @app.route("/favicon.ico")
 def serve_favicon():
     return send_from_directory(SITE_DIR, "favicon.ico")
+
+
+@app.route("/<path:filename>")
+def serve_static(filename):
+    return send_from_directory(SITE_DIR, filename)
 
 
 @app.route("/v1/models", methods=["GET"])

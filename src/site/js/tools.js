@@ -356,7 +356,7 @@
   registerTool({
     name: "io_operations",
     description:
-      "Read, write, list, or delete files on the local filesystem within the project workspace. Requires user permission before executing.",
+      "Read, write, list, or delete files on the local filesystem. Use absolute paths (e.g. C:\\Users\\...) to access any location, or relative paths for the project workspace. Requires user permission before executing.",
     icon: "\uD83D\uDCC1",
     requiresPermission: true,
     parameters: {
@@ -371,7 +371,7 @@
         path: {
           type: "string",
           description:
-            'Relative path within the project workspace (e.g. "src/js/tools.js", "data/output.txt", "logs")',
+            'Relative path (e.g. "src/js/tools.js"), absolute path, or ~/path for home directory (e.g. "~/Desktop/file.txt")',
         },
         content: {
           type: "string",

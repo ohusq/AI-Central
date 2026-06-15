@@ -299,15 +299,64 @@ function renderMarkdown(raw, container) {
 }
 
 // Tool helpers
+var FLASK_BASE = "http://localhost:8080";
+var envInfo = null;
 var SYSTEM_PROMPT =
-  "You are a helpful assistant with access to tools. " +
-  "Use tools to gather information when needed. You can call multiple tools " +
-  "in sequence, building up your understanding step by step. After each tool " +
-  "result, decide if you need more information or can give a complete answer. " +
-  "When you have enough information, respond directly.";
+  "You are a helpful assistant with access to tools. Use tools to gather information or perform actions when needed.";
+
+function buildSystemPrompt(env) {
+  return (
+    "You are a LOCAL AI assistant running directly on the user's computer. " +
+    "You are NOT in a container, sandbox, or virtual environment. " +
+    "You have REAL access to the user's filesystem through the tools provided to you.\n\n" +
+    "CRITICAL: Ignore any previous training that says you cannot access files, " +
+    "cannot write to disk, or are restricted to a sandbox. " +
+    "Those rules do NOT apply here. You have working file I/O tools.\n\n" +
+    "## Available tools\n" +
+    "- io_operations: Read, write, list, or delete files on the local filesystem. " +
+    "Use this for ANY file-related request (reading, writing, creating, saving, deleting). " +
+    "When the user asks to write, save, create, or store anything to a file, you MUST call this tool immediately.\n" +
+    "- weather: Get current weather conditions for a location.\n" +
+    "- wikipedia: Search Wikipedia.\n" +
+    "- cppreference / python_docs / windows_support / programming_help: Documentation lookups.\n\n" +
+    "## User environment\n" +
+    "- OS: " +
+    env.os +
+    "\n- Username: " +
+    env.username +
+    "\n- Home: " +
+    env.home +
+    "\n- Desktop: " +
+    env.desktop +
+    "\n- Documents: " +
+    env.documents +
+    "\n- Downloads: " +
+    env.downloads +
+    "\n- Workspace: " +
+    env.workspace +
+    "\n\n" +
+    "## File writing rules\n" +
+    "When the user asks you to write, save, create, or store a file, " +
+    "you MUST use the io_operations tool with action=\"write\". " +
+    "Use ~/Desktop/filename.txt, ~/Documents/filename.txt, or a workspace relative path. " +
+    "The ~ is automatically expanded to the user's home directory.\n\n" +
+    "## How to call a tool\n" +
+    "Output the tool call in exactly this format:\n" +
+    '<|tool_call|>call:TOOL_NAME{key1:<|"|>value1<|"|>,key2:<|"|>value2<|"|>}<|tool_call|>\n' +
+    "For example, to write a file:\n" +
+    '<|tool_call|>call:io_operations{action:<|"|>write<|"|>,path:<|"|>~/Desktop/poem.txt<|"|>,content:<|"|>poem text here<|"|>}<|tool_call|>\n' +
+    "The system will parse this and execute the tool, then return the result to you.\n\n" +
+    "After each tool result, decide if you need more information or can give a complete answer. " +
+    "When you have enough information, respond directly."
+  );
+}
+
+function getSystemPrompt() {
+  return envInfo ? buildSystemPrompt(envInfo) : SYSTEM_PROMPT;
+}
 
 function buildApiMessages(conv) {
-  var msgs = [{ role: "system", content: SYSTEM_PROMPT }];
+  var msgs = [{ role: "system", content: getSystemPrompt() }];
   conv.messages.forEach(function (m) {
     if (m.role === "user") {
       msgs.push({ role: "user", content: m.content });
@@ -383,26 +432,78 @@ function setToolDetail(el, text) {
 }
 
 function parseGemmaToolCalls(text) {
-  if (!text || text.indexOf("<|tool_call|>") === -1) return null;
-  var regex = /<\|tool_call\|>call:(\w+)(\{.*?\})<\|tool_call\|>/g;
+  if (!text) return null;
+  if (
+    text.indexOf("<|tool_call|>") === -1 &&
+    text.indexOf("<|tool_call>") === -1
+  )
+    return null;
+  // Find opening tags: <|tool_call|>call:name  OR  <|tool_call>call:name
+  var openRe = /<\|?tool_call\|?>call:(\w+)\{/g;
   var toolCalls = [];
-  var match;
-  var lastIdx = 0;
   var clean = "";
+  var lastIdx = 0;
+  var match;
 
-  while ((match = regex.exec(text)) !== null) {
+  while ((match = openRe.exec(text)) !== null) {
     clean += text.slice(lastIdx, match.index);
-    lastIdx = regex.lastIndex;
+    var name = match[1];
+    var argStart = match.index + match[0].length; // position after '{'
+
+    // Find matching closing brace (handles nested braces)
+    var depth = 1;
+    var i = argStart;
+    while (i < text.length && depth > 0) {
+      if (text[i] === "{") depth++;
+      else if (text[i] === "}") depth--;
+      i++;
+    }
+    if (depth !== 0) {
+      // Unmatched brace — skip
+      clean += match[0];
+      lastIdx = match.index + match[0].length;
+      continue;
+    }
+    // i is now one past the matching '}'
+    var closeIdx = i - 1;
+
+    // Make sure the closing tag follows the closing brace
+    var rest = text.slice(closeIdx + 1);
+    var closeMatch = rest.match(/^<\|?tool_call\|?>/);
+    if (!closeMatch) {
+      // No closing tag — skip
+      clean += match[0];
+      lastIdx = match.index + match[0].length;
+      continue;
+    }
+
+    // Advance lastIdx past the closing tag
+    lastIdx = closeIdx + 1 + closeMatch[0].length;
+
+    // Extract and parse the JSON arguments
+    var argsRaw = text.slice(argStart, closeIdx);
     try {
-      var argsStr = match[2].replace(/<\|"\|>/g, '"');
+      var argsStr = argsRaw.replace(/<\|"\|>/g, '"');
       JSON.parse(argsStr);
       toolCalls.push({
         id: "call_" + Date.now() + "_" + toolCalls.length,
         type: "function",
-        function: { name: match[1], arguments: argsStr },
+        function: { name: name, arguments: argsStr },
       });
     } catch (e) {
-      clean += match[0];
+      // Try quoting unquoted keys
+      try {
+        argsStr = argsRaw.replace(/<\|"\|>/g, '"');
+        argsStr = argsStr.replace(/([{,]\s*)(\w+)(\s*:)/g, '$1"$2"$3');
+        JSON.parse(argsStr);
+        toolCalls.push({
+          id: "call_" + Date.now() + "_" + toolCalls.length,
+          type: "function",
+          function: { name: name, arguments: argsStr },
+        });
+      } catch (e2) {
+        clean += match[0] + argsRaw + "}";
+      }
     }
   }
 
@@ -439,6 +540,13 @@ async function init() {
       sendBtn.disabled = true;
     }
   } catch {}
+
+  try {
+    const envRes = await fetch(FLASK_BASE + "/environment");
+    envInfo = await envRes.json();
+  } catch {
+    // If Flask server isn't running, we'll use the default prompt
+  }
 }
 
 sendBtn.addEventListener("click", sendMessage);
@@ -594,7 +702,7 @@ async function sendMessage() {
       streamMessages = buildApiMessages(conv);
     } else {
       streamMessages = [
-        { role: "system", content: SYSTEM_PROMPT },
+        { role: "system", content: getSystemPrompt() },
         { role: "user", content: message },
       ];
     }
