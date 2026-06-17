@@ -22,9 +22,6 @@ SITE_DIR = BASE_DIR / "site"
 WORKSPACE_DIR = BASE_DIR.parent
 LM_STUDIO_URL = "http://localhost:1234"
 
-TOOLS_DIR = BASE_DIR / "tool_data"
-TOOLS_DIR.mkdir(exist_ok=True)
-
 # --------------- helpers ---------------
 
 

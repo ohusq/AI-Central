@@ -1,5 +1,5 @@
 /src/.venv
-/tool_data/
+
 __pycache__/
 *.pyc
 NOTES.TXT
