@@ -1,11 +1,8 @@
 import json
 import os
 import re
-import threading
-import time
 from pathlib import Path
-from urllib.parse import quote, urljoin
-from http.client import HTTPConnection
+from urllib.parse import quote
 
 from flask import (
     Flask,
