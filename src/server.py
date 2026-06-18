@@ -443,6 +443,51 @@ def tool_programming_help(args):
     return 'No search results for "' + query + '".'
 
 
+def tool_html_css(args):
+    query = args.get("query", "").strip()
+    url = args.get("url", "").strip()
+    if not query and not url:
+        return "Please provide a CSS property, HTML element, or topic to look up (e.g. 'flexbox', 'grid', 'div', 'background-color')."
+    if url:
+        content = _fetch_page_content(
+            url,
+            main_markers=['class="main"', 'id="content"', 'role="main"', "<article"],
+            trim_after="See also",
+        )
+        if content:
+            return _truncate(content, 5000)
+        return "Could not fetch URL: " + url
+    mdn_topic = query
+    if not any(x in query.lower() for x in ["css", "html"]):
+        is_css = any(
+            x in query.lower()
+            for x in [
+                "color", "margin", "padding", "flex", "grid", "display",
+                "position", "background", "border", "width", "height",
+                "font", "text-", "transform", "transition", "animation",
+                "box-shadow", "z-index", "overflow", "opacity",
+            ]
+        )
+        mdn_topic = ("css: " if is_css else "html: ") + query
+    mdn_results = _fetch_mdn(mdn_topic)
+    if mdn_results:
+        lines = mdn_results.split("\n\n")
+        result_lines = []
+        for l in lines[:3]:
+            result_lines.append(l)
+        return _truncate(
+            "MDN results for '" + query + "':\n\n" + "\n\n".join(result_lines),
+            5000,
+        )
+    ddg = _ddg_search(query + " MDN web docs")
+    if ddg:
+        lines = [f"{t}\n{s}\n{u}" for t, u, s in ddg]
+        return _truncate(
+            'Search results for "' + query + '":\n\n' + "\n\n".join(lines), 5000
+        )
+    return 'No results found for "' + query + '".'
+
+
 _USER_FOLDERS = {
     "desktop": Path.home() / "Desktop",
     "documents": Path.home() / "Documents",
@@ -582,6 +627,7 @@ TOOL_EXECUTORS = {
     "python_docs": tool_python_docs,
     "windows_support": tool_windows_support,
     "programming_help": tool_programming_help,
+    "html_css": tool_html_css,
     "io_operations": tool_io_operations,
     "news": tool_news,
 }
