@@ -345,6 +345,10 @@ function buildSystemPrompt(env) {
     '<|tool_call|>call:TOOL_NAME{key1:<|"|>value1<|"|>,key2:<|"|>value2<|"|>}<|tool_call|>\n' +
     "For example, to write a file:\n" +
     '<|tool_call|>call:io_operations{action:<|"|>write<|"|>,path:<|"|>~/Desktop/poem.txt<|"|>,content:<|"|>poem text here<|"|>}<|tool_call|>\n' +
+    "For example, to search Wikipedia:\n" +
+    '<|tool_call|>call:wikipedia{action:<|"|>search<|"|>,query:<|"|>artificial intelligence<|"|>}<|tool_call|>\n' +
+    "For example, to read a Wikipedia article:\n" +
+    '<|tool_call|>call:wikipedia{action:<|"|>summary<|"|>,query:<|"|>Python (programming language)<|"|>}<|tool_call|>\n' +
     "The system will parse this and execute the tool, then return the result to you.\n\n" +
     "After each tool result, decide if you need more information or can give a complete answer. " +
     "When you have enough information, respond directly."
@@ -483,7 +487,8 @@ function parseGemmaToolCalls(text) {
     // Extract and parse the JSON arguments
     var argsRaw = text.slice(argStart, closeIdx);
     try {
-      var argsStr = argsRaw.replace(/<\|"\|>/g, '"');
+      var argsStr = "{" + argsRaw.replace(/<\|"\|>/g, '"') + "}";
+      argsStr = argsStr.replace(/([{,]\s*)(\w+)(\s*:)/g, '$1"$2"$3');
       JSON.parse(argsStr);
       toolCalls.push({
         id: "call_" + Date.now() + "_" + toolCalls.length,
@@ -491,19 +496,7 @@ function parseGemmaToolCalls(text) {
         function: { name: name, arguments: argsStr },
       });
     } catch (e) {
-      // Try quoting unquoted keys
-      try {
-        argsStr = argsRaw.replace(/<\|"\|>/g, '"');
-        argsStr = argsStr.replace(/([{,]\s*)(\w+)(\s*:)/g, '$1"$2"$3');
-        JSON.parse(argsStr);
-        toolCalls.push({
-          id: "call_" + Date.now() + "_" + toolCalls.length,
-          type: "function",
-          function: { name: name, arguments: argsStr },
-        });
-      } catch (e2) {
-        clean += match[0] + argsRaw + "}";
-      }
+      clean += match[0] + argsRaw + "}";
     }
   }
 
