@@ -801,3 +801,63 @@ body.sent .result-container::-webkit-scrollbar-corner {
 .perm-always:hover {
   background: #1e3a1e;
 }
+
+/* Message footer */
+.message-footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #2a2a2a;
+  font-size: 0.82em;
+  color: #666;
+  opacity: 0;
+  animation: footerFadeIn 0.4s ease 0.2s forwards;
+}
+
+@keyframes footerFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.retry-btn {
+  background: #2a2a2a;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  padding: 4px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #999;
+  transition: background 0.15s ease, color 0.15s ease;
+  user-select: none;
+}
+
+.retry-btn:hover {
+  background: #3a3a3a;
+  color: #ccc;
+}
+
+.retry-btn:active {
+  background: #444;
+}
+
+.retry-btn svg {
+  width: 14px;
+  height: 14px;
+  display: block;
+}
+
+.tkps-display,
+.reasoning-display {
+  color: #777;
+}

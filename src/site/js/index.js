@@ -1,3 +1,5 @@
+const RETRY_ICON =
+  '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2l4 4-4 4"/><path d="M18 6H5a3 3 0 00-3 3v1"/><path d="M6 18l-4-4 4-4"/><path d="M2 14h13a3 3 0 003-3v-1"/></svg>';
 const TRASH_ICON =
   '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 5h15"/><path d="M4 5v10a2 2 0 002 2h8a2 2 0 002-2V5"/><path d="M7 5V3.5a1 1 0 011-1h4a1 1 0 011 1V5"/><path d="M8 8.5v5"/><path d="M12 8.5v5"/></svg>';
 const CONFIRM_ICON =
@@ -228,6 +230,7 @@ function renderMessages() {
           renderMarkdown(msg.content, contentDiv);
           pendingAiDiv.appendChild(contentDiv);
           chatResult.appendChild(pendingAiDiv);
+          addMessageFooter(pendingAiDiv, conv.id, conv.messages.indexOf(msg), msg.meta);
           pendingAiDiv = null;
         }
       } else if (msg.content) {
@@ -237,6 +240,7 @@ function renderMessages() {
           renderMarkdown(msg.content, contentDiv);
           pendingAiDiv.appendChild(contentDiv);
           chatResult.appendChild(pendingAiDiv);
+          addMessageFooter(pendingAiDiv, conv.id, conv.messages.indexOf(msg), msg.meta);
           pendingAiDiv = null;
         } else {
           const aiDiv = document.createElement("div");
@@ -250,6 +254,7 @@ function renderMessages() {
           renderMarkdown(msg.content, contentDiv);
           aiDiv.appendChild(contentDiv);
           chatResult.appendChild(aiDiv);
+          addMessageFooter(aiDiv, conv.id, conv.messages.indexOf(msg), msg.meta);
         }
       }
     }
@@ -505,6 +510,86 @@ function parseGemmaToolCalls(text) {
   return { content: clean || null, tool_calls: toolCalls };
 }
 
+function addMessageFooter(aiDiv, convId, msgIndex, meta) {
+  var footer = document.createElement("div");
+  footer.className = "message-footer";
+
+  var retryBtn = document.createElement("button");
+  retryBtn.className = "retry-btn";
+  retryBtn.innerHTML = RETRY_ICON;
+  retryBtn.title = "Retry this response";
+  retryBtn.addEventListener("click", function () {
+    handleRetry(convId, msgIndex);
+  });
+  footer.appendChild(retryBtn);
+
+  if (meta) {
+    if (meta.totalTokens && meta.streamingMs) {
+      var tkPerSec = (meta.totalTokens / meta.streamingMs).toFixed(1);
+      var tkpsSpan = document.createElement("span");
+      tkpsSpan.className = "tkps-display";
+      tkpsSpan.textContent = tkPerSec + " Tk/s";
+      footer.appendChild(tkpsSpan);
+    }
+
+    if (meta.reasoningMs != null) {
+      var reasoningTime = (meta.reasoningMs / 1000).toFixed(1);
+      var reasoningSpan = document.createElement("span");
+      reasoningSpan.className = "reasoning-display";
+      reasoningSpan.textContent = "Reasoning: " + reasoningTime + "s";
+      footer.appendChild(reasoningSpan);
+    }
+  }
+
+  aiDiv.appendChild(footer);
+}
+
+function handleRetry(convId, msgIndex) {
+  if (isStreaming) return;
+
+  var conv = conversations.find(function (c) {
+    return c.id === convId;
+  });
+  if (!conv) return;
+
+  var userMsgIndex = -1;
+  for (var i = msgIndex; i >= 0; i--) {
+    if (conv.messages[i].role === "user") {
+      userMsgIndex = i;
+      break;
+    }
+  }
+  if (userMsgIndex === -1) return;
+
+  var userContent = conv.messages[userMsgIndex].content;
+
+  conv.messages.splice(userMsgIndex);
+  conv.updatedAt = Date.now();
+  saveConversations();
+
+  currentConversationId = conv.id;
+  renderConversationList();
+
+  var msgEls = chatResult.querySelectorAll(".message");
+  for (var i = userMsgIndex; i < msgEls.length; i++) {
+    if (msgEls[i] && msgEls[i].parentNode) {
+      msgEls[i].remove();
+    }
+  }
+
+  if (conv.messages.length === 0) {
+    var wrapper = document.createElement("div");
+    wrapper.className = "welcome-greeting";
+    wrapper.id = "welcome-greeting";
+    wrapper.innerHTML =
+      '<div class="greeting-text">\u200B</div><div class="greeting-sub">AI Central</div>';
+    chatResult.appendChild(wrapper);
+  }
+
+  input.value = userContent;
+  sendMessage();
+}
+
 async function init() {
   Tools.loadPermissions();
   loadConversations();
@@ -597,6 +682,11 @@ async function sendMessage() {
   isStreaming = true;
   var hasStarted = false;
   var rawMarkdown = "";
+  var streamStartTime = performance.now();
+  var firstTokenTime = null;
+  var streamEndTime = null;
+  var totalTokens = 0;
+  var tokenUsageSource = "estimated";
 
   try {
     var toolSchemas = Tools.getSchemas();
@@ -741,12 +831,18 @@ async function sendMessage() {
         var data = line.slice(6);
         if (data === "[DONE]") break;
 
-        try {
-          var json = JSON.parse(data);
-          var content = json.choices?.[0]?.delta?.content || "";
+          try {
+            var json = JSON.parse(data);
+            var content = json.choices?.[0]?.delta?.content || "";
 
-          if (!hasStarted && content) {
+            if (json.usage && json.usage.completion_tokens) {
+              totalTokens = json.usage.completion_tokens;
+              tokenUsageSource = "actual";
+            }
+
+            if (!hasStarted && content) {
             hasStarted = true;
+            firstTokenTime = performance.now();
             reasoningEl.classList.add("fading");
             setTimeout(function () {
               reasoningEl.remove();
@@ -763,6 +859,10 @@ async function sendMessage() {
       }
     }
 
+    if (tokenUsageSource === "estimated" && hasStarted && rawMarkdown) {
+      totalTokens = Math.round(rawMarkdown.length / 4);
+    }
+
     if (!hasStarted) {
       reasoningEl.classList.add("fading");
       setTimeout(function () {
@@ -777,10 +877,18 @@ async function sendMessage() {
   }
 
   if (hasStarted && rawMarkdown) {
-    conv.messages.push({ role: "assistant", content: rawMarkdown });
+    streamEndTime = performance.now();
+    var meta = {
+      totalTokens: totalTokens,
+      tokenUsageSource: tokenUsageSource,
+      reasoningMs: Math.round(firstTokenTime - streamStartTime),
+      streamingMs: Math.round(streamEndTime - firstTokenTime),
+    };
+    conv.messages.push({ role: "assistant", content: rawMarkdown, meta: meta });
     conv.updatedAt = Date.now();
     saveConversations();
     renderConversationList();
+    addMessageFooter(aiDiv, conv.id, conv.messages.length - 1, meta);
   }
 
   isStreaming = false;
