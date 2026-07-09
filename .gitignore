@@ -3,5 +3,7 @@
 __pycache__/
 *.pyc
 NOTES.TXT
+.vscode
+
 # This one is for mainly LLMs to easily add a tool. More reference, not really a main project addition
 HOW_TO_ADD_A_TOOL.txt
