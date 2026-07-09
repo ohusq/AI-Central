@@ -2,9 +2,9 @@ import json
 import os
 from pathlib import Path
 
-from flask import jsonify, request, Response, stream_with_context, send_from_directory
+from flask import Response, jsonify, request, send_from_directory, stream_with_context
 
-from .config import SITE_DIR, WORKSPACE_DIR, LM_STUDIO_URL
+from .config import LM_STUDIO_URL, SITE_DIR, WORKSPACE_DIR
 from .helpers import lm_studio_request
 from .tools import TOOL_EXECUTORS
 
@@ -48,8 +48,8 @@ def register_routes(app):
         body = request.get_json(silent=True) or {}
         is_stream = body.get("stream", False)
         timeout = 120
-        import urllib.request
         import urllib.error
+        import urllib.request
 
         data = json.dumps(body).encode("utf-8")
         req = urllib.request.Request(
@@ -120,3 +120,79 @@ def register_routes(app):
             return jsonify({"result": result})
         except Exception as e:
             return jsonify({"error": str(e)}), 500
+
+    # ── Gmail API routes ──────────────────────────────────────────────────────
+
+    @app.route("/api/gmail/status", methods=["GET"])
+    def gmail_status():
+        from .gmail_crypto import has_credentials, mask_email
+        from .tools.gmail import get_credentials
+
+        if not has_credentials():
+            return jsonify({"connected": False, "email": None, "locked": False})
+
+        cached = get_credentials()
+        if cached:
+            return jsonify({
+                "connected": True,
+                "email": mask_email(cached[0]),
+                "locked": False,
+            })
+
+        return jsonify({"connected": True, "email": None, "locked": True})
+
+    @app.route("/api/gmail/setup", methods=["POST"])
+    def gmail_setup():
+        data = request.get_json(silent=True) or {}
+        email = data.get("email", "").strip()
+        app_password = data.get("app_password", "").strip()
+        master_password = data.get("master_password", "").strip()
+
+        if not email or not app_password or not master_password:
+            return jsonify({"error": "All fields are required"}), 400
+        if "@" not in email:
+            return jsonify({"error": "Invalid email address"}), 400
+
+        from .gmail_crypto import encrypt_credentials, mask_email
+        from .gmail_imap import GmailIMAP
+
+        try:
+            test = GmailIMAP(email, app_password)
+            test.connect()
+            test.disconnect()
+        except Exception as e:
+            return jsonify({"error": f"Gmail connection failed: {str(e)}"}), 400
+
+        encrypt_credentials(email, app_password, master_password)
+
+        from .tools.gmail import set_credentials
+        set_credentials(email, app_password)
+
+        return jsonify({"success": True, "email": mask_email(email)})
+
+    @app.route("/api/gmail/unlock", methods=["POST"])
+    def gmail_unlock():
+        data = request.get_json(silent=True) or {}
+        master_password = data.get("master_password", "").strip()
+
+        if not master_password:
+            return jsonify({"error": "Master password is required"}), 400
+
+        from .gmail_crypto import decrypt_credentials, mask_email
+        from .tools.gmail import set_credentials
+
+        try:
+            creds = decrypt_credentials(master_password)
+            set_credentials(creds["email"], creds["app_password"])
+            return jsonify({"success": True, "email": mask_email(creds["email"])})
+        except Exception:
+            return jsonify({"error": "Incorrect master password"}), 403
+
+    @app.route("/api/gmail/disconnect", methods=["POST"])
+    def gmail_disconnect():
+        from .gmail_crypto import clear_credentials
+        from .tools.gmail import clear_credentials_cache
+
+        clear_credentials()
+        clear_credentials_cache()
+        return jsonify({"success": True})

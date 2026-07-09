@@ -32,6 +32,7 @@
     <script src="js/tools/tool-html_css.js" defer></script>
     <script src="js/tools/tool-io_operations.js" defer></script>
     <script src="js/tools/tool-news.js" defer></script>
+    <script src="js/tools/tool-gmail.js" defer></script>
     <script src="js/greetings.js" defer></script>
     <script src="js/index.js" defer></script>
 
@@ -66,6 +67,13 @@
         <div class="conversation-list" id="conversation-list"></div>
       </div>
     </div>
+
+    <button class="settings-btn" id="settings-btn" title="Settings">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="3"/>
+        <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06A1.65 1.65 0 0019.32 9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/>
+      </svg>
+    </button>
 
     <div class="main-container">
       <div class="chat-container">
@@ -125,6 +133,91 @@
           >
             Always Allow
           </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Settings modal -->
+    <div id="settings-modal" class="modal-overlay">
+      <div class="modal-box">
+        <div class="modal-header">
+          <span class="modal-title">Settings</span>
+          <button class="modal-close" id="settings-close-btn">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="settings-section">
+            <div class="settings-section-title">Google Services</div>
+            <div class="service-card" id="gmail-card">
+              <div class="service-card-left">
+                <span class="service-icon">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none">
+                    <path fill-rule="evenodd" clip-rule="evenodd" d="M3.75 5.25L3 6V18L3.75 18.75H20.25L21 18V6L20.25 5.25H3.75ZM4.5 7.6955V17.25H19.5V7.69525L11.9999 14.5136L4.5 7.6955ZM18.3099 6.75H5.68986L11.9999 12.4864L18.3099 6.75Z" fill="#e0e0e0"/>
+                  </svg>
+                </span>
+                <div class="service-info">
+                  <span class="service-name">Gmail</span>
+                  <span class="service-status" id="gmail-status">Loading...</span>
+                </div>
+              </div>
+              <div class="service-card-right">
+                <button class="service-btn" id="gmail-action-btn">Connect</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Unlock modal (shown at startup if credentials exist) -->
+    <div id="unlock-modal" class="modal-overlay">
+      <div class="modal-box modal-box-sm">
+        <div class="modal-header">
+          <span class="modal-title">&#x1F512; Gmail Locked</span>
+          <span></span>
+        </div>
+        <div class="modal-body">
+          <p class="unlock-desc">Enter your master password to unlock Gmail access.</p>
+          <input type="password" id="unlock-password" class="modal-input" placeholder="Master password" autocomplete="off" />
+          <div id="unlock-error" class="modal-error"></div>
+          <div class="modal-actions">
+            <button class="modal-btn modal-btn-secondary" id="unlock-skip-btn">Skip</button>
+            <button class="modal-btn modal-btn-primary" id="unlock-submit-btn">Unlock</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Connect Gmail modal -->
+    <div id="connect-modal" class="modal-overlay">
+      <div class="modal-box">
+        <div class="modal-header">
+          <span class="modal-title">Connect Gmail</span>
+          <button class="modal-close" id="connect-close-btn">&times;</button>
+        </div>
+        <div class="modal-body">
+          <p class="connect-desc">Sign in with an App Password. You need to enable IMAP in Gmail first.</p>
+          <div class="connect-field">
+            <label class="connect-label">Gmail address</label>
+            <input type="email" id="connect-email" class="modal-input" placeholder="you@gmail.com" autocomplete="off" />
+          </div>
+          <div class="connect-field">
+            <label class="connect-label">App password</label>
+            <input type="password" id="connect-app-pw" class="modal-input" placeholder="16-character app password" autocomplete="off" />
+            <a class="connect-help" href="https://myaccount.google.com/apppasswords" target="_blank">Generate app password</a>
+          </div>
+          <div class="connect-field">
+            <label class="connect-label">Master password (encrypts your credentials)</label>
+            <input type="password" id="connect-master-pw" class="modal-input" placeholder="Choose a master password" autocomplete="off" />
+          </div>
+          <div class="connect-field">
+            <label class="connect-label">Confirm master password</label>
+            <input type="password" id="connect-master-pw-confirm" class="modal-input" placeholder="Confirm master password" autocomplete="off" />
+          </div>
+          <div id="connect-error" class="modal-error"></div>
+          <div class="modal-actions">
+            <button class="modal-btn modal-btn-secondary" id="connect-cancel-btn">Cancel</button>
+            <button class="modal-btn modal-btn-primary" id="connect-submit-btn">Connect</button>
+          </div>
         </div>
       </div>
     </div>

@@ -1,7 +1,7 @@
 import re
 from urllib.parse import quote
 
-from ..helpers import fetch, clean_html, truncate
+from ..helpers import clean_html, fetch, truncate
 from .base import BaseTool
 
 

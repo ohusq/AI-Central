@@ -5,5 +5,8 @@ __pycache__/
 NOTES.TXT
 .vscode
 
+# Encrypted credentials (never commit secrets)
+src/tool_data/*.enc
+
 # This one is for mainly LLMs to easily add a tool. More reference, not really a main project addition
 HOW_TO_ADD_A_TOOL.txt

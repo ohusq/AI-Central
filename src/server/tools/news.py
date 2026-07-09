@@ -1,6 +1,6 @@
 from urllib.parse import quote
 
-from ..helpers import fetch, clean_html, ddg_search
+from ..helpers import clean_html, ddg_search, fetch
 from .base import BaseTool
 
 

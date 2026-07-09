@@ -440,6 +440,20 @@ function setToolDetail(el, text) {
   if (detailEl) detailEl.textContent = text;
 }
 
+function toolDetailFromArgs(toolName, args) {
+  if (toolName === "gmail" && args.action) {
+    var labels = {
+      search_emails: "\u201C" + (args.query || "") + "\u201D",
+      read_email: "read email",
+      list_unread: "unread",
+    };
+    return labels[args.action] || args.action;
+  }
+  var preview = (args && args.query) || "";
+  if (preview.length > 60) preview = preview.slice(0, 60) + "...";
+  return preview;
+}
+
 function parseGemmaToolCalls(text) {
   if (!text) return null;
   if (
@@ -625,6 +639,17 @@ async function init() {
   } catch {
     // If Flask server isn't running, we'll use the default prompt
   }
+
+  // Check Gmail unlock status
+  try {
+    const gmailRes = await fetch(FLASK_BASE + "/api/gmail/status");
+    const gmailData = await gmailRes.json();
+    if (gmailData.connected && gmailData.locked) {
+      showUnlockModal();
+    }
+  } catch {
+    // Server unavailable, ignore
+  }
 }
 
 sendBtn.addEventListener("click", sendMessage);
@@ -744,9 +769,8 @@ async function sendMessage() {
             setToolStatus(toolEl, "busy");
             var toolResult = await Tools.execute(fn.name, args);
             setToolStatus(toolEl, "success");
-            var preview = toolResult.split("\n")[0];
-            if (preview.length > 60) preview = preview.slice(0, 60) + "...";
-            setToolDetail(toolEl, preview);
+            var detail = toolDetailFromArgs(fn.name, args);
+            setToolDetail(toolEl, detail);
 
             conv.messages.push({
               role: "tool",
@@ -893,5 +917,226 @@ async function sendMessage() {
 
   isStreaming = false;
 }
+
+// ── Gmail / Settings ─────────────────────────────────────────────────────────
+
+function openModal(id) {
+  var el = document.getElementById(id);
+  if (!el) return;
+  el.classList.add("active");
+}
+
+function closeModal(id) {
+  var el = document.getElementById(id);
+  if (!el) return;
+  el.classList.remove("active");
+}
+
+function refreshGmailStatus() {
+  var statusEl = document.getElementById("gmail-status");
+  var actionBtn = document.getElementById("gmail-action-btn");
+  if (!statusEl || !actionBtn) return;
+
+  statusEl.textContent = "Loading...";
+  actionBtn.disabled = true;
+  actionBtn.textContent = "..."
+
+  fetch(FLASK_BASE + "/api/gmail/status")
+    .then(function (r) {
+      if (!r.ok) throw new Error("Status fetch failed");
+      return r.json();
+    })
+    .then(function (data) {
+      actionBtn.disabled = false;
+      if (!data.connected) {
+        statusEl.textContent = "Not connected";
+        actionBtn.textContent = "Connect";
+        actionBtn.className = "service-btn";
+        actionBtn.onclick = function () { openModal("connect-modal"); };
+      } else if (data.locked) {
+        statusEl.textContent = "Locked";
+        actionBtn.textContent = "Unlock";
+        actionBtn.className = "service-btn";
+        actionBtn.onclick = function () { openModal("unlock-modal"); };
+      } else {
+        statusEl.textContent = data.email ? "Connected as " + data.email : "Connected";
+        actionBtn.textContent = "Disconnect";
+        actionBtn.className = "service-btn connected";
+        actionBtn.onclick = function () {
+          if (confirm("Disconnect Gmail? This will remove your saved credentials.")) {
+            actionBtn.disabled = true;
+            actionBtn.textContent = "...";
+            fetch(FLASK_BASE + "/api/gmail/disconnect", { method: "POST" })
+              .then(function () { refreshGmailStatus(); })
+              .catch(function () { actionBtn.disabled = false; actionBtn.textContent = "Disconnect"; });
+          }
+        };
+      }
+    })
+    .catch(function () {
+      statusEl.textContent = "Not connected";
+      actionBtn.disabled = false;
+      actionBtn.textContent = "Connect";
+      actionBtn.className = "service-btn";
+      actionBtn.onclick = function () { closeModal("settings-modal"); openModal("connect-modal"); };
+    });
+}
+
+// Settings modal
+document.getElementById("settings-btn").addEventListener("click", function () {
+  refreshGmailStatus();
+  openModal("settings-modal");
+});
+
+document.getElementById("settings-close-btn").addEventListener("click", function () {
+  closeModal("settings-modal");
+});
+
+document.getElementById("settings-modal").addEventListener("click", function (e) {
+  if (e.target === this) closeModal("settings-modal");
+});
+
+// Unlock modal
+function showUnlockModal() {
+  var err = document.getElementById("unlock-error");
+  err.classList.remove("visible");
+  err.textContent = "";
+  document.getElementById("unlock-password").value = "";
+  document.getElementById("unlock-password").classList.remove("error");
+  openModal("unlock-modal");
+  document.getElementById("unlock-password").focus();
+}
+
+document.getElementById("unlock-submit-btn").addEventListener("click", function () {
+  var pwEl = document.getElementById("unlock-password");
+  var err = document.getElementById("unlock-error");
+  err.classList.remove("visible");
+  pwEl.classList.remove("error");
+  var pw = pwEl.value.trim();
+  if (!pw) {
+    err.textContent = "Please enter your master password.";
+    err.classList.add("visible");
+    pwEl.classList.add("error");
+    return;
+  }
+  var btn = this;
+  btn.disabled = true;
+  btn.textContent = "Unlocking...";
+
+  fetch(FLASK_BASE + "/api/gmail/unlock", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ master_password: pw }),
+  })
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      if (data.error) {
+        err.textContent = data.error;
+        err.classList.add("visible");
+        pwEl.classList.add("error");
+        btn.disabled = false;
+        btn.textContent = "Unlock";
+        return;
+      }
+      closeModal("unlock-modal");
+      refreshGmailStatus();
+    })
+    .catch(function () {
+      err.textContent = "Connection error";
+      err.classList.add("visible");
+      btn.disabled = false;
+      btn.textContent = "Unlock";
+    });
+});
+
+document.getElementById("unlock-password").addEventListener("keydown", function (e) {
+  if (e.key === "Enter") document.getElementById("unlock-submit-btn").click();
+});
+
+document.getElementById("unlock-skip-btn").addEventListener("click", function () {
+  closeModal("unlock-modal");
+});
+
+// Connect modal
+document.getElementById("connect-close-btn").addEventListener("click", function () {
+  closeModal("connect-modal");
+});
+
+document.getElementById("connect-cancel-btn").addEventListener("click", function () {
+  closeModal("connect-modal");
+});
+
+document.getElementById("connect-modal").addEventListener("click", function (e) {
+  if (e.target === this) closeModal("connect-modal");
+});
+
+document.getElementById("connect-submit-btn").addEventListener("click", function () {
+  var email = document.getElementById("connect-email").value.trim();
+  var appPw = document.getElementById("connect-app-pw").value.trim();
+  var masterPw = document.getElementById("connect-master-pw").value.trim();
+  var masterConfirm = document.getElementById("connect-master-pw-confirm").value.trim();
+  var errorEl = document.getElementById("connect-error");
+  var masterInput = document.getElementById("connect-master-pw");
+  var confirmInput = document.getElementById("connect-master-pw-confirm");
+
+  errorEl.classList.remove("visible");
+  errorEl.textContent = "";
+  [masterInput, confirmInput].forEach(function (el) { el.classList.remove("error"); });
+
+  if (!email || !appPw || !masterPw || !masterConfirm) {
+    errorEl.textContent = "All fields are required.";
+    errorEl.classList.add("visible");
+    return;
+  }
+  if (masterPw !== masterConfirm) {
+    errorEl.textContent = "Master passwords do not match.";
+    errorEl.classList.add("visible");
+    masterInput.classList.add("error");
+    confirmInput.classList.add("error");
+    return;
+  }
+  if (masterPw.length < 4) {
+    errorEl.textContent = "Master password must be at least 4 characters.";
+    errorEl.classList.add("visible");
+    masterInput.classList.add("error");
+    return;
+  }
+
+  var btn = this;
+  btn.disabled = true;
+  btn.textContent = "Connecting...";
+
+  fetch(FLASK_BASE + "/api/gmail/setup", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email: email, app_password: appPw, master_password: masterPw }),
+  })
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      if (data.error) {
+        errorEl.textContent = data.error;
+        errorEl.classList.add("visible");
+        btn.disabled = false;
+        btn.textContent = "Connect";
+        return;
+      }
+      closeModal("connect-modal");
+      closeModal("settings-modal");
+      refreshGmailStatus();
+    })
+    .catch(function () {
+      errorEl.textContent = "Connection error";
+      errorEl.classList.add("visible");
+      btn.disabled = false;
+      btn.textContent = "Connect";
+    });
+});
+
+// Close connect-modal on Escape from any of its inputs
+["connect-email", "connect-app-pw", "connect-master-pw", "connect-master-pw-confirm"].forEach(function (id) {
+  document.getElementById(id).addEventListener("keydown", function (e) {
+    if (e.key === "Enter") document.getElementById("connect-submit-btn").click();
+  });
+});
 
 init();

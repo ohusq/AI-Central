@@ -1,11 +1,12 @@
-from .weather import WeatherTool
 from .cppreference import CppreferenceTool
-from .python_docs import PythonDocsTool
-from .windows_support import WindowsSupportTool
-from .programming_help import ProgrammingHelpTool
+from .gmail import GmailTool
 from .html_css import HtmlCssTool
 from .io_operations import IoOperationsTool
 from .news import NewsTool
+from .programming_help import ProgrammingHelpTool
+from .python_docs import PythonDocsTool
+from .weather import WeatherTool
+from .windows_support import WindowsSupportTool
 
 TOOL_EXECUTORS = {
     tool.name: tool.execute
@@ -18,6 +19,7 @@ TOOL_EXECUTORS = {
         HtmlCssTool(),
         IoOperationsTool(),
         NewsTool(),
+        GmailTool(),
     ]
 }
 

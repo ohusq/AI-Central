@@ -1,5 +1,4 @@
 import os
-from pathlib import Path
 
 from ..helpers import resolve_path, truncate
 from .base import BaseTool

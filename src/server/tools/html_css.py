@@ -1,7 +1,6 @@
 from ..helpers import ddg_search, truncate
-from ..helpers import fetch_json as _fetch_json
-from .programming_help import _fetch_mdn, _fetch_page_content
 from .base import BaseTool
+from .programming_help import _fetch_mdn, _fetch_page_content
 
 
 class HtmlCssTool(BaseTool):

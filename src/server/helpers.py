@@ -1,5 +1,4 @@
 import json
-import os
 import re
 from pathlib import Path
 from urllib.parse import quote
@@ -36,7 +35,7 @@ def ddg_search(query, max_results=5):
     ):
         raw_url = m.group(1).strip()
         if "uddg=" in raw_url:
-            from urllib.parse import unquote, parse_qs, urlparse
+            from urllib.parse import parse_qs, urlparse
 
             parsed = urlparse(raw_url)
             qs = parse_qs(parsed.query)
@@ -84,8 +83,8 @@ def fetch_json(url, timeout=15):
 
 
 def lm_studio_request(method, path, body=None, stream=False):
-    import urllib.request
     import urllib.error
+    import urllib.request
 
     from .config import LM_STUDIO_URL
 
@@ -108,7 +107,7 @@ def lm_studio_request(method, path, body=None, stream=False):
 
 
 def resolve_path(path_str):
-    from .config import WORKSPACE_DIR, _USER_FOLDERS
+    from .config import _USER_FOLDERS, WORKSPACE_DIR
 
     if path_str.startswith("~"):
         path_str = str(Path.home() / path_str.lstrip("~\\/"))

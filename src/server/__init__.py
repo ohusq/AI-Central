@@ -1,6 +1,6 @@
 from flask import Flask
 
-from .config import SITE_DIR, WORKSPACE_DIR, LM_STUDIO_URL
+from .config import LM_STUDIO_URL, SITE_DIR, WORKSPACE_DIR
 from .routes import register_routes
 
 
