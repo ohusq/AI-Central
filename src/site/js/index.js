@@ -525,7 +525,7 @@ function addMessageFooter(aiDiv, convId, msgIndex, meta) {
 
   if (meta) {
     if (meta.totalTokens && meta.streamingMs) {
-      var tkPerSec = (meta.totalTokens / meta.streamingMs).toFixed(1);
+      var tkPerSec = (meta.totalTokens / (meta.streamingMs / 1000)).toFixed(1);
       var tkpsSpan = document.createElement("span");
       tkpsSpan.className = "tkps-display";
       tkpsSpan.textContent = tkPerSec + " Tk/s";
