@@ -325,7 +325,8 @@ function buildSystemPrompt(env) {
     "- gmail_send: Send new emails or reply to existing ones. Actions: send_email (to, subject, body), reply (uid, body). Always show the email to the user first and ask permission.\n" +
     "- weather: Get current weather conditions for a location.\n" +
     "- wikipedia: Search Wikipedia.\n" +
-    "- cppreference / python_docs / windows_support / programming_help: Documentation lookups.\n\n" +
+    "- cppreference / python_docs / windows_support / programming_help: Documentation lookups.\n" +
+    "- shopify_liquid: Search Shopify Liquid documentation for tags, filters, objects, and syntax. Use this for ANY Shopify theme development, Liquid template language, or storefront rendering question.\n\n" +
     "## User environment\n" +
     "- OS: " +
     env.os +

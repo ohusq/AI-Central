@@ -124,6 +124,7 @@
     io_operations: "File Operations",
     windows_support: "Windows Support",
     programming_help: "Programming Help",
+    shopify_liquid: "Shopify Liquid",
   };
 
   function listTools() {
