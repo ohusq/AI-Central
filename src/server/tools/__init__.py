@@ -5,6 +5,7 @@ from .io_operations import IoOperationsTool
 from .news import NewsTool
 from .programming_help import ProgrammingHelpTool
 from .python_docs import PythonDocsTool
+from .shopify_liquid import ShopifyLiquidTool
 from .weather import WeatherTool
 from .windows_support import WindowsSupportTool
 
@@ -20,6 +21,7 @@ TOOL_EXECUTORS = {
         IoOperationsTool(),
         NewsTool(),
         GmailTool(),
+        ShopifyLiquidTool(),
     ]
 }
 
