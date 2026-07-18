@@ -1,9 +1,14 @@
 import email
 import imaplib
+import re
+import smtplib
 from email.header import decode_header
+from email.mime.text import MIMEText
 
 IMAP_SERVER = "imap.gmail.com"
 IMAP_PORT = 993
+SMTP_SERVER = "smtp.gmail.com"
+SMTP_PORT = 465
 
 _HEADER_FIELDS = "(BODY.PEEK[HEADER.FIELDS (FROM SUBJECT DATE MESSAGE-ID)])"
 
@@ -15,7 +20,7 @@ class GmailIMAP:
         self._conn: imaplib.IMAP4_SSL | None = None
 
     def connect(self):
-        self._conn = imaplib.IMAP4_SSL(IMAP_SERVER, IMAP_PORT)
+        self._conn = imaplib.IMAP4_SSL(IMAP_SERVER, IMAP_PORT, timeout=15)
         self._conn.login(self.email_address, self.app_password)
 
     def disconnect(self):
@@ -108,6 +113,58 @@ class GmailIMAP:
 
     def list_unread(self, max_results: int = 10, folder: str = "INBOX") -> list[dict]:
         return self.search("is:unread", max_results, folder)
+
+    @staticmethod
+    def _strip_markdown(text: str) -> str:
+        text = re.sub(r"\*\*(.+?)\*\*", r"\1", text)
+        text = re.sub(r"\*(.+?)\*", r"\1", text)
+        text = re.sub(r"__([^_]+)__", r"\1", text)
+        text = re.sub(r"_([^_]+)_", r"\1", text)
+        text = re.sub(r"`{1,3}[^`]*`{1,3}", "", text)
+        text = re.sub(r"#{1,6}\s+", "", text)
+        text = re.sub(r">\s", "", text)
+        text = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", text)
+        text = re.sub(r"[-*+]\s", "", text)
+        text = re.sub(r"\n{3,}", "\n\n", text)
+        return text.strip()
+
+    def send_email(self, to_email: str, subject: str, body: str) -> dict:
+        body = self._strip_markdown(body)
+        msg = MIMEText(body, "plain")
+        msg["From"] = self.email_address
+        msg["To"] = to_email
+        msg["Subject"] = subject
+
+        with smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT, timeout=15) as server:
+            server.login(self.email_address, self.app_password)
+            server.send_message(msg)
+
+        return {"status": "sent", "to": to_email, "subject": subject}
+
+    def reply_email(self, uid: str | int, body: str) -> dict:
+        original = self.read_message(uid)
+        if not original:
+            raise ValueError("Original message not found")
+
+        body = self._strip_markdown(body)
+        subject = original["subject"]
+        if not subject.lower().startswith("re:"):
+            subject = "Re: " + subject
+
+        msg = MIMEText(body, "plain")
+        msg["From"] = self.email_address
+        msg["To"] = original["from"]
+        msg["Subject"] = subject
+
+        if original.get("message_id"):
+            msg["In-Reply-To"] = original["message_id"]
+            msg["References"] = original["message_id"]
+
+        with smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT, timeout=15) as server:
+            server.login(self.email_address, self.app_password)
+            server.send_message(msg)
+
+        return {"status": "replied", "to": original["from"], "subject": subject}
 
     @staticmethod
     def _decode_header_value(value: str) -> str:

@@ -99,16 +99,68 @@
     return data.result;
   };
 
+  function getPermission(name) {
+    return permissions[name] || "ask";
+  }
+
+  function setPermission(name, value) {
+    if (value === "ask") {
+      delete permissions[name];
+    } else {
+      permissions[name] = value;
+    }
+    savePermissions();
+  }
+
+  var DISPLAY_NAMES = {
+    gmail_read: "Gmail Read",
+    gmail_send: "Gmail Send",
+    weather: "Weather",
+    wikipedia: "Wikipedia",
+    news: "News",
+    cppreference: "C++ Reference",
+    python_docs: "Python Docs",
+    html_css: "HTML/CSS",
+    io_operations: "File Operations",
+    windows_support: "Windows Support",
+    programming_help: "Programming Help",
+  };
+
+  function listTools() {
+    return Object.keys(tools).map(function (name) {
+      var t = tools[name];
+      return {
+        name: name,
+        displayName: t.displayName || DISPLAY_NAMES[name] || name,
+        icon: t.icon || "?",
+        description: t.description || "",
+        permission: getPermission(name),
+      };
+    });
+  }
+
   async function executeTool(name, args) {
     var tool = tools[name];
     if (!tool) throw new Error("Unknown tool: " + name);
 
-    if (tool.requiresPermission && permissions[name] !== "always") {
+    var perm = getPermission(name);
+    if (perm === "never") {
+      throw new Error("Permission denied for " + name + " (blocked in settings)");
+    }
+
+    var needsPerm = false;
+    if (typeof tool.needsPermission === "function") {
+      needsPerm = tool.needsPermission(args);
+    } else if (tool.needsPermission) {
+      needsPerm = true;
+    }
+    if (needsPerm && perm !== "always") {
       var granted = await requestPermission(name, args);
       if (!granted) throw new Error("User denied permission for " + name);
     }
 
-    return await tool.execute(args);
+    var result = await tool.execute(args);
+    return result;
   }
 
   function getInfo(name) {
@@ -123,6 +175,9 @@
     execute: executeTool,
     getInfo: getInfo,
     loadPermissions: loadPermissions,
+    listTools: listTools,
+    getPermission: getPermission,
+    setPermission: setPermission,
   };
 
   loadPermissions();

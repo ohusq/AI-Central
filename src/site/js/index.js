@@ -321,6 +321,8 @@ function buildSystemPrompt(env) {
     "- io_operations: Read, write, list, or delete files on the local filesystem. " +
     "Use this for ANY file-related request (reading, writing, creating, saving, deleting). " +
     "When the user asks to write, save, create, or store anything to a file, you MUST call this tool immediately.\n" +
+    "- gmail_read: Search your Gmail inbox and read emails. Actions: search_emails (query), read_email (uid), list_unread. Use search_emails, NOT \"search\".\n" +
+    "- gmail_send: Send new emails or reply to existing ones. Actions: send_email (to, subject, body), reply (uid, body). Always show the email to the user first and ask permission.\n" +
     "- weather: Get current weather conditions for a location.\n" +
     "- wikipedia: Search Wikipedia.\n" +
     "- cppreference / python_docs / windows_support / programming_help: Documentation lookups.\n\n" +
@@ -356,7 +358,20 @@ function buildSystemPrompt(env) {
     '<|tool_call|>call:wikipedia{action:<|"|>summary<|"|>,query:<|"|>Python (programming language)<|"|>}<|tool_call|>\n' +
     "The system will parse this and execute the tool, then return the result to you.\n\n" +
     "After each tool result, decide if you need more information or can give a complete answer. " +
-    "When you have enough information, respond directly."
+    "When you have enough information, respond directly.\n\n" +
+    "## Email rules\n" +
+    "When the user asks to reply to an email or mentions a subject from an email, " +
+    "IMMEDIATELY use gmail_read to search for and read that email. Do NOT ask the user for details you can find in the email itself.\n" +
+    "After reading the email, immediately write a draft response. " +
+    "If the user says to send it (e.g. \"stuur gelijk\", \"send it now\"), use gmail_send right away, do NOT ask again.\n" +
+    "If the user did NOT say to send it, show the draft first and ask if they want to send it. " +
+    "The system will ask for permission before sending.\n" +
+    "Write emails in simple, everyday language. Do not use complex words, em dashes (-- or —), " +
+    "fancy vocabulary, or formal business language. Write like a normal person would talk. " +
+    "Keep sentences short and clear.\n" +
+    "Do NOT use any markdown or formatting in the email body. No bold (**), no italic (*), " +
+    "no headings, no bullet points, no code blocks. Write plain text only.\n" +
+    "For example, instead of 'I am writing to inquire about...' use 'Can you tell me more about...'"
   );
 }
 
@@ -803,6 +818,9 @@ async function sendMessage() {
       }
     }
 
+    // Save pre-call response as fallback if streaming produces nothing
+    var precallContent = (toolSchemas.length > 0 && result && !result.tool_calls && result.content) ? result.content : null;
+
     // Stream the final answer (tool path uses full history, non-tool path uses single message)
     var streamMessages;
     if (toolSchemas.length > 0) {
@@ -824,75 +842,83 @@ async function sendMessage() {
       }),
     });
 
-    if (!response.ok) {
-      reasoningEl.classList.add("fading");
-      setTimeout(function () {
-        reasoningEl.remove();
-        contentEl.textContent =
-          "Error: " + response.status + " " + response.statusText;
-        aiDiv.appendChild(contentEl);
-        scrollToBottom();
-      }, 400);
-      isStreaming = false;
-      return;
-    }
+      if (!response.ok) {
+        reasoningEl.classList.add("fading");
+        setTimeout(function () {
+          reasoningEl.remove();
+          contentEl.textContent =
+            "Error: " + response.status + " " + response.statusText;
+          var firstTool = aiDiv.querySelector(".tool-call");
+          if (firstTool) {
+            aiDiv.insertBefore(contentEl, firstTool);
+          } else {
+            aiDiv.appendChild(contentEl);
+          }
+          scrollToBottom();
+        }, 400);
+        isStreaming = false;
+        return;
+      }
 
-    var reader = response.body.getReader();
-    var decoder = new TextDecoder();
-    var buffer = "";
+      var reader = response.body.getReader();
+      var decoder = new TextDecoder();
+      var buffer = "";
 
-    while (true) {
-      var readResult = await reader.read();
-      if (readResult.done) break;
+      while (true) {
+        var readResult = await reader.read();
+        if (readResult.done) break;
 
-      buffer += decoder.decode(readResult.value, { stream: true });
-      var lines = buffer.split("\n");
-      buffer = lines.pop();
+        buffer += decoder.decode(readResult.value, { stream: true });
+        var lines = buffer.split("\n");
+        buffer = lines.pop();
 
-      for (var li = 0; li < lines.length; li++) {
-        var line = lines[li];
-        if (!line.startsWith("data: ")) continue;
-        var data = line.slice(6);
-        if (data === "[DONE]") break;
+        for (var li = 0; li < lines.length; li++) {
+          var line = lines[li];
+          if (!line.startsWith("data: ")) continue;
+          var data = line.slice(6);
+          if (data === "[DONE]") break;
 
-          try {
-            var json = JSON.parse(data);
-            var content = json.choices?.[0]?.delta?.content || "";
+            try {
+              var json = JSON.parse(data);
+              var content = json.choices?.[0]?.delta?.content || "";
 
-            if (json.usage && json.usage.completion_tokens) {
-              totalTokens = json.usage.completion_tokens;
-              tokenUsageSource = "actual";
+              if (json.usage && json.usage.completion_tokens) {
+                totalTokens = json.usage.completion_tokens;
+                tokenUsageSource = "actual";
+              }
+
+              if (!hasStarted && content) {
+              hasStarted = true;
+              firstTokenTime = performance.now();
+              aiDiv.appendChild(contentEl);
+              reasoningEl.classList.add("fading");
+              setTimeout(function () {
+                reasoningEl.remove();
+                scrollToBottom();
+              }, 400);
             }
 
-            if (!hasStarted && content) {
-            hasStarted = true;
-            firstTokenTime = performance.now();
-            reasoningEl.classList.add("fading");
-            setTimeout(function () {
-              reasoningEl.remove();
-              aiDiv.appendChild(contentEl);
-              scrollToBottom();
-            }, 400);
-          }
-
-          if (hasStarted) {
-            rawMarkdown += content;
-            renderMarkdown(rawMarkdown, contentEl);
-          }
-        } catch (e) {}
+            if (hasStarted) {
+              rawMarkdown += content;
+              var displayText = rawMarkdown.replace(/<\|?tool_call\|?>[\s\S]*?<\|?tool_call\|?>/g, '');
+              if (content || displayText) {
+                renderMarkdown(displayText, contentEl);
+              }
+            }
+          } catch (e) {}
+        }
       }
-    }
 
-    if (tokenUsageSource === "estimated" && hasStarted && rawMarkdown) {
-      totalTokens = Math.round(rawMarkdown.length / 4);
-    }
+      if (tokenUsageSource === "estimated" && hasStarted && rawMarkdown) {
+        totalTokens = Math.round(rawMarkdown.length / 4);
+      }
 
-    if (!hasStarted) {
-      reasoningEl.classList.add("fading");
-      setTimeout(function () {
-        reasoningEl.remove();
-      }, 400);
-    }
+      if (!hasStarted) {
+        reasoningEl.classList.add("fading");
+        setTimeout(function () {
+          reasoningEl.remove();
+        }, 400);
+      }
   } catch (err) {
     contentEl.textContent = "Error: " + err.message;
     if (contentEl.parentNode !== aiDiv) aiDiv.appendChild(contentEl);
@@ -908,11 +934,37 @@ async function sendMessage() {
       reasoningMs: Math.round(firstTokenTime - streamStartTime),
       streamingMs: Math.round(streamEndTime - firstTokenTime),
     };
-    conv.messages.push({ role: "assistant", content: rawMarkdown, meta: meta });
-    conv.updatedAt = Date.now();
-    saveConversations();
-    renderConversationList();
-    addMessageFooter(aiDiv, conv.id, conv.messages.length - 1, meta);
+    // Strip tool call tags from saved content
+    var cleanContent = rawMarkdown.replace(/<\|?tool_call\|?>[\s\S]*?<\|?tool_call\|?>/g, '').trim();
+    if (cleanContent) {
+      conv.messages.push({ role: "assistant", content: cleanContent, meta: meta });
+      conv.updatedAt = Date.now();
+      saveConversations();
+      renderConversationList();
+      addMessageFooter(aiDiv, conv.id, conv.messages.length - 1, meta);
+    }
+  }
+
+  // Fallback: if streaming produced only tool calls, use pre-call response
+  if (precallContent && (!hasStarted || (hasStarted && rawMarkdown && !rawMarkdown.replace(/<\|?tool_call\|?>[\s\S]*?<\|?tool_call\|?>/g, '').trim()))) {
+    precallContent = precallContent.replace(/<\|?tool_call\|?>[\s\S]*?<\|?tool_call\|?>/g, '').trim();
+    if (precallContent) {
+      reasoningEl.classList.add("fading");
+      setTimeout(function () {
+        reasoningEl.remove();
+        aiDiv.appendChild(contentEl);
+        renderMarkdown(precallContent, contentEl);
+        scrollToBottom();
+        if (!hasStarted) {
+          conv.messages.push({ role: "assistant", content: precallContent });
+        }
+        conv.updatedAt = Date.now();
+        saveConversations();
+        renderConversationList();
+        addMessageFooter(aiDiv, conv.id, conv.messages.length - 1, {});
+      }, 400);
+      hasStarted = true;
+    }
   }
 
   isStreaming = false;
@@ -995,6 +1047,99 @@ document.getElementById("settings-close-btn").addEventListener("click", function
 document.getElementById("settings-modal").addEventListener("click", function (e) {
   if (e.target === this) closeModal("settings-modal");
 });
+
+// Settings tabs
+document.querySelectorAll(".settings-tab").forEach(function (tab) {
+  tab.addEventListener("click", function () {
+    document.querySelectorAll(".settings-tab").forEach(function (t) { t.classList.remove("active"); });
+    document.querySelectorAll(".tab-content").forEach(function (c) { c.classList.remove("active"); });
+    this.classList.add("active");
+    var target = document.getElementById("tab-" + this.getAttribute("data-tab"));
+    if (target) {
+      target.classList.add("active");
+      if (target.id === "tab-permissions") {
+        renderPermissionsList();
+      }
+    }
+  });
+});
+
+function renderPermissionsList() {
+  var listEl = document.getElementById("perm-list");
+  if (!listEl) return;
+
+  var tools = Tools.listTools();
+  if (tools.length === 0) {
+    listEl.innerHTML = '<div class="perm-list-empty">No tools registered.</div>';
+    return;
+  }
+
+  listEl.innerHTML = "";
+  tools.forEach(function (tool) {
+    var perm = Tools.getPermission(tool.name);
+
+    var item = document.createElement("div");
+    item.className = "perm-item";
+    item.setAttribute("data-tool", tool.name);
+
+    var left = document.createElement("div");
+    left.className = "perm-item-left";
+
+    var icon = document.createElement("span");
+    icon.className = "perm-item-icon";
+    icon.textContent = tool.icon;
+
+    var nameEl = document.createElement("span");
+    nameEl.className = "perm-item-name";
+    nameEl.textContent = tool.displayName;
+
+    var infoEl = document.createElement("span");
+    infoEl.className = "perm-item-info";
+    infoEl.textContent = "\u24D8";
+    if (tool.description) {
+      infoEl.setAttribute("data-tip", tool.description);
+    }
+
+    left.appendChild(icon);
+    left.appendChild(nameEl);
+    left.appendChild(infoEl);
+
+    var actions = document.createElement("div");
+    actions.className = "perm-item-actions";
+
+    var askBtn = document.createElement("button");
+    askBtn.className = "perm-toggle-btn" + (perm === "ask" ? " active-ask" : "");
+    askBtn.textContent = "Ask";
+    askBtn.addEventListener("click", function () {
+      Tools.setPermission(tool.name, "ask");
+      renderPermissionsList();
+    });
+
+    var allowBtn = document.createElement("button");
+    allowBtn.className = "perm-toggle-btn" + (perm === "always" ? " active-allow" : "");
+    allowBtn.textContent = "Allow";
+    allowBtn.addEventListener("click", function () {
+      Tools.setPermission(tool.name, "always");
+      renderPermissionsList();
+    });
+
+    var denyBtn = document.createElement("button");
+    denyBtn.className = "perm-toggle-btn" + (perm === "never" ? " active-deny" : "");
+    denyBtn.textContent = "Deny";
+    denyBtn.addEventListener("click", function () {
+      Tools.setPermission(tool.name, "never");
+      renderPermissionsList();
+    });
+
+    actions.appendChild(askBtn);
+    actions.appendChild(allowBtn);
+    actions.appendChild(denyBtn);
+
+    item.appendChild(left);
+    item.appendChild(actions);
+    listEl.appendChild(item);
+  });
+}
 
 // Unlock modal
 function showUnlockModal() {

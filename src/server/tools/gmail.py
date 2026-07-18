@@ -60,6 +60,31 @@ class GmailTool(BaseTool):
                 results = gmail.list_unread(max_results)
                 return json.dumps({"results": results, "count": len(results)})
 
+            elif action == "send_email":
+                permission = args.get("permission_granted", False)
+                if not permission:
+                    return json.dumps({"error": "Permission denied", "needs_permission": True})
+                to_email = args.get("to", "").strip()
+                subject = args.get("subject", "").strip()
+                body = args.get("body", "").strip()
+                if not to_email or not body:
+                    return '{"error": "to and body are required"}'
+                if not subject:
+                    subject = "(no subject)"
+                result = gmail.send_email(to_email, subject, body)
+                return json.dumps(result)
+
+            elif action == "reply":
+                permission = args.get("permission_granted", False)
+                if not permission:
+                    return json.dumps({"error": "Permission denied", "needs_permission": True})
+                uid = args.get("uid", "")
+                body = args.get("body", "").strip()
+                if not uid or not body:
+                    return '{"error": "uid and body are required"}'
+                result = gmail.reply_email(uid, body)
+                return json.dumps(result)
+
             else:
                 return json.dumps({"error": f"Unknown action: {action}"})
 

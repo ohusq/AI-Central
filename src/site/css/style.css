@@ -1178,3 +1178,196 @@ body.sent .result-container::-webkit-scrollbar-corner {
 .connect-help:hover {
   text-decoration: underline;
 }
+
+/* ── Settings tabs ─────────────────────────────────────────────────────────── */
+
+.settings-tabs {
+  display: flex;
+  gap: 0;
+  padding: 0 22px;
+  border-bottom: 1px solid #3a3a3a;
+}
+
+.settings-tab {
+  padding: 10px 18px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #777;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  font-family: inherit;
+  transition: color 0.15s, border-color 0.15s;
+  margin-bottom: -1px;
+}
+
+.settings-tab:hover {
+  color: #bbb;
+  border-bottom-color: #555;
+}
+
+.settings-tab.active {
+  color: #e0e0e0;
+  border-bottom-color: #ccc;
+}
+
+.tab-content {
+  display: none;
+}
+
+.tab-content.active {
+  display: block;
+  animation: tabFadeIn 0.2s ease;
+}
+
+@keyframes tabFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ── Permissions list ──────────────────────────────────────────────────────── */
+
+.perm-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.perm-list-empty {
+  color: #666;
+  font-size: 13px;
+  text-align: center;
+  padding: 20px 0;
+}
+
+.perm-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: #1a1a1a;
+  border: 1px solid #2a2a2a;
+  border-radius: 10px;
+}
+
+.perm-item-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.perm-item-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: #2a2a2a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.perm-item-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: #e0e0e0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.perm-item-info {
+  font-size: 14px;
+  color: #555;
+  cursor: help;
+  flex-shrink: 0;
+  position: relative;
+  transition: color 0.15s;
+}
+
+.perm-item-info:hover {
+  color: #999;
+}
+
+.perm-item-info[data-tip]:hover::after {
+  content: attr(data-tip);
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 8px);
+  background: #2a2a2a;
+  border: 1px solid #444;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 400;
+  color: #ccc;
+  white-space: normal;
+  width: 240px;
+  line-height: 1.5;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  z-index: 10;
+  pointer-events: none;
+  animation: tipFadeIn 0.15s ease;
+}
+
+@keyframes tipFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.perm-item-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.perm-toggle-btn {
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid #333;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
+  background: #1e1e1e;
+  color: #777;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+
+.perm-toggle-btn:hover {
+  background: #2a2a2a;
+  color: #bbb;
+}
+
+.perm-toggle-btn.active-ask {
+  background: #1a2a1a;
+  border-color: #2a5a2a;
+  color: #66dd66;
+}
+
+.perm-toggle-btn.active-allow {
+  background: #1a2a3a;
+  border-color: #2a4a6a;
+  color: #66aaff;
+}
+
+.perm-toggle-btn.active-deny {
+  background: #2a1a1a;
+  border-color: #5a2a2a;
+  color: #e06666;
+}

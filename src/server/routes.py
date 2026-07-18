@@ -107,14 +107,15 @@ def register_routes(app):
         args = data.get("args", {})
         if name not in TOOL_EXECUTORS:
             return jsonify({"error": f"Unknown tool: {name}"}), 400
-        if name == "io_operations":
-            granted = data.get("permission_granted", False)
-            if not granted:
-                return jsonify(
-                    {
-                        "error": "Permission denied. User must grant permission on the frontend first."
-                    }
-                ), 403
+        granted = data.get("permission_granted", False)
+        if granted:
+            args["permission_granted"] = True
+        if name == "io_operations" and not granted:
+            return jsonify(
+                {
+                    "error": "Permission denied. User must grant permission on the frontend first."
+                }
+            ), 403
         try:
             result = TOOL_EXECUTORS[name](args)
             return jsonify({"result": result})
