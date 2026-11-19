@@ -10,3 +10,11 @@ src/tool_data/*.enc
 
 # This one is for mainly LLMs to easily add a tool. More reference, not really a main project addition
 HOW_TO_ADD_A_TOOL.txt
+
+# Now looking back at me writing the text before this, I have immense regret since this will slow down my development a shit ton.
+# Planning on redoing a big part of the project anyways, since its mostly AI slop. Will keep the UI the same except for some backend and how it all functions.
+
+
+# Personal TODO.MD file which I just use to track my bugs and put them as fixed or still broken.
+# You'd think pull requests are great for this purpose. Except I hate them and for small bugs it's too time consuming, don't expect me to use them a lot on my OWN projects <3
+TODO.MD
