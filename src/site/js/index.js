@@ -668,7 +668,7 @@ async function init() {
       throw jsonErr;
     }
 
-    let modelName = data.data?.[0]?.id;
+    modelName = data.data?.[0]?.id;
     const moreThanOneModel = (data.data?.length ?? 0) > 1;
     console.log(data);
     if (!modelName) {
