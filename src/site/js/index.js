@@ -59,7 +59,7 @@ function loadConversations() {
 function saveConversations() {
   try {
     localStorage.setItem(CONVERSATIONS_KEY, JSON.stringify(conversations));
-  } catch {}
+  } catch { }
 }
 
 function generateTitle(text) {
@@ -218,7 +218,7 @@ function renderMessages() {
           var args = {};
           try {
             args = JSON.parse(tc.function.arguments);
-          } catch (e) {}
+          } catch (e) { }
           var el = createToolCallElement(tc.function.name, args);
           el.classList.add("success");
           pendingAiDiv.appendChild(el);
@@ -639,22 +639,62 @@ async function init() {
     updateGreeting();
   }
 
+  let url = `${LM_STUDIO_BASE}/v1/models`;
+
   try {
-    const res = await fetch(`${LM_STUDIO_BASE}/v1/models`);
-    const data = await res.json();
-    modelName = data.data[0]?.id;
+    const res = await fetch(url, { mode: 'cors' });
+
+    let data;
+    try {
+      data = await res.json();
+    } catch (jsonErr) {
+      if (jsonErr instanceof SyntaxError) {
+        alert('Bad news, the JSON from the API is not valid. Check your console window for more information! (F12)');
+        console.error(
+          `
+          Failed to retrieve JSON from the LM Studio server, if you have a server set up correctly then this is really bad.
+          This error only appears when it can reach the API as a request, but not load up the models. Check your installation of LM Studio before creating an issue!
+
+          Info:
+          LM Studio *BASE* address: ${LM_STUDIO_BASE}
+
+          Error dump:
+          ${jsonErr}
+          `
+        );
+        sendBtn.disabled = true;
+        return;
+      }
+      throw jsonErr;
+    }
+
+    modelName = data.data?.[0]?.id;
     if (!modelName) {
-      chatResult.textContent = "No model loaded in LM Studio";
+      alert("No model loaded in LM Studio");
+      console.warn("No model loaded in LM Studio");
       sendBtn.disabled = true;
     }
-  } catch {}
+
+  } catch (err) {
+    sendBtn.disabled = true;
+
+    if (err instanceof TypeError) {
+      try {
+        await fetch(url, { mode: 'no-cors' });
+        alert("CORS error: Enable CORS in LM Studio's Local Server settings. Check the console (F12) for details.");
+      } catch {
+        alert("Cannot connect to LM Studio. Make sure the local server is running. Check the console (F12) for details.");
+      }
+    } else {
+      console.error("Unexpected error:", err);
+      alert("Unexpected error, check the console (F12) for details.");
+    }
+  }
 
   try {
     const envRes = await fetch(FLASK_BASE + "/environment");
     envInfo = await envRes.json();
-  } catch {
-    // If Flask server isn't running, we'll use the default prompt
-  }
+  } catch {}
 
   // Check Gmail unlock status
   try {
@@ -663,9 +703,7 @@ async function init() {
     if (gmailData.connected && gmailData.locked) {
       showUnlockModal();
     }
-  } catch {
-    // Server unavailable, ignore
-  }
+  } catch {}
 }
 
 sendBtn.addEventListener("click", sendMessage);
@@ -843,83 +881,83 @@ async function sendMessage() {
       }),
     });
 
-      if (!response.ok) {
-        reasoningEl.classList.add("fading");
-        setTimeout(function () {
-          reasoningEl.remove();
-          contentEl.textContent =
-            "Error: " + response.status + " " + response.statusText;
-          var firstTool = aiDiv.querySelector(".tool-call");
-          if (firstTool) {
-            aiDiv.insertBefore(contentEl, firstTool);
-          } else {
-            aiDiv.appendChild(contentEl);
-          }
-          scrollToBottom();
-        }, 400);
-        isStreaming = false;
-        return;
-      }
-
-      var reader = response.body.getReader();
-      var decoder = new TextDecoder();
-      var buffer = "";
-
-      while (true) {
-        var readResult = await reader.read();
-        if (readResult.done) break;
-
-        buffer += decoder.decode(readResult.value, { stream: true });
-        var lines = buffer.split("\n");
-        buffer = lines.pop();
-
-        for (var li = 0; li < lines.length; li++) {
-          var line = lines[li];
-          if (!line.startsWith("data: ")) continue;
-          var data = line.slice(6);
-          if (data === "[DONE]") break;
-
-            try {
-              var json = JSON.parse(data);
-              var content = json.choices?.[0]?.delta?.content || "";
-
-              if (json.usage && json.usage.completion_tokens) {
-                totalTokens = json.usage.completion_tokens;
-                tokenUsageSource = "actual";
-              }
-
-              if (!hasStarted && content) {
-              hasStarted = true;
-              firstTokenTime = performance.now();
-              aiDiv.appendChild(contentEl);
-              reasoningEl.classList.add("fading");
-              setTimeout(function () {
-                reasoningEl.remove();
-                scrollToBottom();
-              }, 400);
-            }
-
-            if (hasStarted) {
-              rawMarkdown += content;
-              var displayText = rawMarkdown.replace(/<\|?tool_call\|?>[\s\S]*?<\|?tool_call\|?>/g, '');
-              if (content || displayText) {
-                renderMarkdown(displayText, contentEl);
-              }
-            }
-          } catch (e) {}
+    if (!response.ok) {
+      reasoningEl.classList.add("fading");
+      setTimeout(function () {
+        reasoningEl.remove();
+        contentEl.textContent =
+          "Error: " + response.status + " " + response.statusText;
+        var firstTool = aiDiv.querySelector(".tool-call");
+        if (firstTool) {
+          aiDiv.insertBefore(contentEl, firstTool);
+        } else {
+          aiDiv.appendChild(contentEl);
         }
-      }
+        scrollToBottom();
+      }, 400);
+      isStreaming = false;
+      return;
+    }
 
-      if (tokenUsageSource === "estimated" && hasStarted && rawMarkdown) {
-        totalTokens = Math.round(rawMarkdown.length / 4);
-      }
+    var reader = response.body.getReader();
+    var decoder = new TextDecoder();
+    var buffer = "";
 
-      if (!hasStarted) {
-        reasoningEl.classList.add("fading");
-        setTimeout(function () {
-          reasoningEl.remove();
-        }, 400);
+    while (true) {
+      var readResult = await reader.read();
+      if (readResult.done) break;
+
+      buffer += decoder.decode(readResult.value, { stream: true });
+      var lines = buffer.split("\n");
+      buffer = lines.pop();
+
+      for (var li = 0; li < lines.length; li++) {
+        var line = lines[li];
+        if (!line.startsWith("data: ")) continue;
+        var data = line.slice(6);
+        if (data === "[DONE]") break;
+
+        try {
+          var json = JSON.parse(data);
+          var content = json.choices?.[0]?.delta?.content || "";
+
+          if (json.usage && json.usage.completion_tokens) {
+            totalTokens = json.usage.completion_tokens;
+            tokenUsageSource = "actual";
+          }
+
+          if (!hasStarted && content) {
+            hasStarted = true;
+            firstTokenTime = performance.now();
+            aiDiv.appendChild(contentEl);
+            reasoningEl.classList.add("fading");
+            setTimeout(function () {
+              reasoningEl.remove();
+              scrollToBottom();
+            }, 400);
+          }
+
+          if (hasStarted) {
+            rawMarkdown += content;
+            var displayText = rawMarkdown.replace(/<\|?tool_call\|?>[\s\S]*?<\|?tool_call\|?>/g, '');
+            if (content || displayText) {
+              renderMarkdown(displayText, contentEl);
+            }
+          }
+        } catch (e) { }
       }
+    }
+
+    if (tokenUsageSource === "estimated" && hasStarted && rawMarkdown) {
+      totalTokens = Math.round(rawMarkdown.length / 4);
+    }
+
+    if (!hasStarted) {
+      reasoningEl.classList.add("fading");
+      setTimeout(function () {
+        reasoningEl.remove();
+      }, 400);
+    }
   } catch (err) {
     contentEl.textContent = "Error: " + err.message;
     if (contentEl.parentNode !== aiDiv) aiDiv.appendChild(contentEl);
