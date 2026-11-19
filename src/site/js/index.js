@@ -668,11 +668,17 @@ async function init() {
       throw jsonErr;
     }
 
-    modelName = data.data?.[0]?.id;
+    let modelName = data.data?.[0]?.id;
+    const moreThanOneModel = (data.data?.length ?? 0) > 1;
+    console.log(data);
     if (!modelName) {
       alert("No model loaded in LM Studio");
       console.warn("No model loaded in LM Studio");
       sendBtn.disabled = true;
+    } else if (moreThanOneModel) {
+      let msg = "Please disable 'Just-in-Time Model Loading' in your LM Studio API, otherwise we can't check if a model is loaded in or auto-select the wrong one."
+      alert(msg);
+      console.warn(msg);
     }
 
   } catch (err) {
