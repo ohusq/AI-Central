@@ -25,7 +25,7 @@ class NewsTool(BaseTool):
                 results = []
                 for item in items[:max_results]:
                     title = (item.findtext("title") or "").strip()
-                    link = (item.findtext("link") or "").strip()
+                    # link = (item.findtext("link") or "").strip()
                     pub_date = (item.findtext("pubDate") or "").strip()
                     source = (item.findtext("source") or "").strip()
                     desc = clean_html(item.findtext("description") or "")

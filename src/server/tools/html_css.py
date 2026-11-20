@@ -35,10 +35,10 @@ class HtmlCssTool(BaseTool):
             mdn_topic = ("css: " if is_css else "html: ") + query
         mdn_results = _fetch_mdn(mdn_topic)
         if mdn_results:
-            lines = mdn_results.split("\n\n")
+            lines_split = mdn_results.split("\n\n")
             result_lines = []
-            for l in lines[:3]:
-                result_lines.append(l)
+            for lines in lines_split[:3]:
+                result_lines.append(lines)
             return truncate(
                 "MDN results for '" + query + "':\n\n" + "\n\n".join(result_lines),
                 5000,

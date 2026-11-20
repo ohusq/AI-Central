@@ -58,9 +58,11 @@ class CppreferenceTool(BaseTool):
                 if idx >= 0:
                     text = text[idx:]
                 lines = [
-                    l
-                    for l in text.split("\n")
-                    if l.strip() and len(l.strip()) > 15 and not l.strip().startswith("[")
+                    stripped
+                    for line in text.split("\n")
+                    if (stripped := line.strip())
+                    and len(stripped) > 15
+                    and not stripped.startswith("[")
                 ]
                 return truncate(
                     'Search results for "' + query + '":\n' + "\n".join(lines[:15])
